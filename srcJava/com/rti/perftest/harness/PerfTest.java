@@ -754,14 +754,13 @@ public final class PerfTest {
                 _executionTime = 60;
             }
             // Check if large data or small data
-            if (_scanDataLenSizes.get(0) < Math.min(MAX_SYNCHRONOUS_SIZE.VALUE,MAX_BOUNDED_SEQ_SIZE.VALUE)
-                    && _scanDataLenSizes.get(_scanDataLenSizes.size() - 1) > Math.min(MAX_SYNCHRONOUS_SIZE.VALUE,MAX_BOUNDED_SEQ_SIZE.VALUE)) {
+            if (_scanDataLenSizes.get(0) < MAX_BOUNDED_SEQ_SIZE.VALUE
+                    && _scanDataLenSizes.get(_scanDataLenSizes.size() - 1) > MAX_BOUNDED_SEQ_SIZE.VALUE) {
                 System.err.printf("The sizes of -scan [");
                 for (int i = 0; i < _scanDataLenSizes.size(); i++) {
                     System.err.printf(_scanDataLenSizes.get(i) + " ");
                 }
-                System.err.printf("] should be either all smaller or all bigger than " +
-                        Math.min(MAX_SYNCHRONOUS_SIZE.VALUE,MAX_BOUNDED_SEQ_SIZE.VALUE) + "\n");
+                System.err.printf("] should be either all smaller or all bigger than " + MAX_BOUNDED_SEQ_SIZE.VALUE + "\n");
                 return false;
             }
         }
@@ -884,10 +883,6 @@ public final class PerfTest {
                 sb.append("\tNumber of samples: " );
                 sb.append(_numIter);
                 sb.append("\n");
-            }
-        } else {
-            if (_dataLen > MAX_SYNCHRONOUS_SIZE.VALUE) {
-                sb.append("\tExpecting Large Data Type\n");
             }
         }
 

@@ -94,6 +94,16 @@ public class PerftestTransport {
     public boolean useMulticast = false;
     public boolean customMulticastAddrSet = false;
 
+    public static final long DEFAULT_MESSAGE_SIZE_MAX = 65536;
+    public static final long MESSAGE_SIZE_MAX_NOT_SET = -1;
+    public static final long MESSAGE_OVERHEAD_BYTES = 2536;
+
+    /*
+     * This is the minimum size across all the active transports
+     * message_size_max
+     */
+    public long minimumMessageSizeMax;
+
     /**************************************************************************/
     /* PRIVATE CLASS MEMBERS*/
 
@@ -124,6 +134,8 @@ public class PerftestTransport {
         multicastAddrMap.put(LATENCY_TOPIC_NAME.VALUE, "239.255.1.1");
         multicastAddrMap.put(ANNOUNCEMENT_TOPIC_NAME.VALUE, "239.255.1.2");
         multicastAddrMap.put(THROUGHPUT_TOPIC_NAME.VALUE, "239.255.1.100");
+
+        minimumMessageSizeMax = MESSAGE_SIZE_MAX_NOT_SET;
 
     }
 
@@ -885,6 +897,126 @@ public class PerftestTransport {
                 false);
     }
 
+    /*
+    * Gets the MessageSizeMax given the name (String) of a transport from a
+    * DDS_DomainParticipantQos object. If the value is not present, returns
+    * DEFAULT_MESSAGE_SIZE_MAX.
+    */
+    long getMessageSizeMaxForTransport(
+            String targetTransportName,
+            DomainParticipantQos qos)
+    {
+        std::string propertyName =
+                transport.transportConfigMap[targetTransportName].prefixString
+                + ".parent.message_size_max";
+
+        std::string property_value = qos_properties[propertyName];
+        if (!property_value.empty()) {
+            //printf("Value for %s is %s\n", propertyName.c_str(), property_value.c_str());
+            return atoi(property_value.c_str());
+        } else {
+            //printf("Value for %s not found, returning default\n", propertyName.c_str());
+            return DEFAULT_MESSAGE_SIZE_MAX;
+        }
+    }
+
+    /*
+    * Configures the minimumMessageSizeMax value in the PerftestTransport object with
+    * the minimum value for all the enabled transports in the XML configuration.
+    */
+    void configureMessageSizeMaxTransport(DomainParticipantQos qos)
+    {
+
+        long qosConfigurationMessageSizeMax = MESSAGE_SIZE_MAX_NOT_SET;
+        long transportMessageSizeMax = MESSAGE_SIZE_MAX_NOT_SET;
+
+        int mask = qos.transport_builtin.mask;
+
+        if ((mask & TransportBuiltinKind.UDPv4) != 0) {
+            transportMessageSizeMax = getMessageSizeMaxForTransport("SHMEM", qos);
+
+            if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+                qosConfigurationMessageSizeMax = transportMessageSizeMax;
+            } else {
+                if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+                    qosConfigurationMessageSizeMax = transportMessageSizeMax;
+                }
+            }
+        }
+        // if ((mask & TransportBuiltinMask::udpv4()) != 0) {
+        //     transportMessageSizeMax = getMessageSizeMaxForTransport(
+        //             "UDPv4",
+        //             transport,
+        //             qos_properties);
+
+        //     if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+        //         qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //     } else {
+        //         if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+        //             qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //         }
+        //     }
+        // }
+        // if ((mask & TransportBuiltinMask::udpv6()) != 0) {
+        //     transportMessageSizeMax = getMessageSizeMaxForTransport(
+        //             "UDPv6",
+        //             transport,
+        //             qos_properties);
+        //     if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+        //         qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //     } else {
+        //         if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+        //             qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //         }
+        //     }
+        // }
+        // if (transport.transportConfig.kind == TRANSPORT_TCPv4
+        //         || transport.transportConfig.kind == TRANSPORT_TLSv4) {
+        //     transportMessageSizeMax = getMessageSizeMaxForTransport(
+        //             "TCP",
+        //             transport,
+        //             qos_properties);
+        //     if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+        //         qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //     } else {
+        //         if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+        //             qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //         }
+        //     }
+        // }
+        // if (transport.transportConfig.kind == TRANSPORT_DTLSv4) {
+        //     transportMessageSizeMax = getMessageSizeMaxForTransport(
+        //             "DTLS",
+        //             transport,
+        //             qos_properties);
+        //     if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+        //         qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //     } else {
+        //         if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+        //             qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //         }
+        //     }
+        // }
+        // if (transport.transportConfig.kind == TRANSPORT_WANv4) {
+        //     transportMessageSizeMax = getMessageSizeMaxForTransport(
+        //             "WAN",
+        //             transport,
+        //             qos_properties);
+        //     if (transportMessageSizeMax != MESSAGE_SIZE_MAX_NOT_SET) {
+        //         qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //     } else {
+        //         if (transportMessageSizeMax < qosConfigurationMessageSizeMax) {
+        //             qosConfigurationMessageSizeMax = transportMessageSizeMax;
+        //         }
+        //     }
+        // }
+
+        minimumMessageSizeMax = transportMessageSizeMax;
+    }
+
+
+
+
     public boolean configureTransport(DomainParticipantQos qos) {
 
         /*
@@ -1010,6 +1142,13 @@ public class PerftestTransport {
         } else {
             allowInterfaces = "";
         }
+
+        /*
+        * Once the configurations have been stablished, we can get the
+        * MessageSizeMax for the Transport, which should be the minimum of
+        * all the enabled transports
+        */
+        configureMessageSizeMaxTransport(qos);
 
         setTransportVerbosity(qos);
 

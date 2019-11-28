@@ -106,6 +106,7 @@ public final class RTIDDSImpl<T> implements IMessaging {
     private boolean _usePositiveAcks = true;
     private boolean _isDebug = false;
     private boolean _latencyTest = false;
+    private long _maxSynchronousSize = PerftestTransport.MESSAGE_SIZE_MAX_NOT_SET;
     private boolean _isLargeData = false;
     private boolean _isScan = false;
     private boolean _isPublisher = false;
@@ -1166,6 +1167,11 @@ public final class RTIDDSImpl<T> implements IMessaging {
         if (_secureUseSecure) {
             sb.append("\n");
             sb.append(printSecureArgs());
+        }
+
+        // We want to expose if we are using or not the unbounded type
+        if (_useUnbounded == 0) {
+            sb.append("\n[IMPORTANT]: Using the Unbounded Sequence Type\n");
         }
 
         return sb.toString();
